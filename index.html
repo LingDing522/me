@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MC服务器管理站</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        mcGreen: '#4CAF50',
+                        mcDark: '#222222',
+                        mcGray: '#333333',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .mc-bg {
+            background-image: url('https://picsum.photos/id/237/1920/1080');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        .glass {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .btn-mc {
+            background: #4CAF50;
+            transition: all 0.2s;
+        }
+        .btn-mc:hover {
+            background: #388E3C;
+            transform: scale(1.02);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4CAF50;
+            border-radius: 3px;
+        }
+        /* 复制成功提示 */
+        #copyTip {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #4CAF50;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 200;
+            display: none;
+            font-weight: bold;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body class="mc-bg min-h-screen text-white overflow-x-hidden">
+    <!-- 复制成功提示 -->
+    <div id="copyTip">已复制到剪贴板</div>
+
+    <!-- 左上角管理员按钮 -->
+    <div class="fixed top-4 left-4 z-50">
+        <button onclick="openLogin()" class="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-800/40 transition">
+            <i class="fa fa-cog"></i>
+            <span>管理员面板</span>
+        </button>
+    </div>
+
+    <!-- 登录弹窗 -->
+    <div id="loginModal" class="fixed inset-0 bg-black/80 z-[100] hidden flex items-center justify-center">
+        <div class="glass w-[90%] max-w-md p-6 rounded-xl">
+            <h2 class="text-2xl font-bold mb-4 text-mcGreen">管理员登录</h2>
+            <div class="mb-3">
+                <label class="block mb-1">账号</label>
+                <input id="loginUser" value="admin" class="w-full bg-mcGray p-2 rounded border border-gray-600 outline-green-500">
+            </div>
+            <div class="mb-4">
+                <label class="block mb-1">密码</label>
+                <input id="loginPwd" type="password" placeholder="输入密码" class="w-full bg-mcGray p-2 rounded border border-gray-600 outline-green-500">
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeLogin()" class="flex-1 py-2 rounded bg-gray-600 hover:bg-gray-500">取消</button>
+                <button onclick="checkLogin()" class="flex-1 py-2 rounded btn-mc">登录</button>
+            </div>
+            <p id="loginTip" class="text-red-400 mt-2 text-sm hidden">账号或密码错误</p>
+        </div>
+    </div>
+
+    <!-- 管理员后台面板 -->
+    <div id="adminPanel" class="fixed inset-0 bg-black/90 z-[90] hidden overflow-auto p-4">
+        <div class="max-w-5xl mx-auto glass p-6 rounded-xl">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-3xl font-bold text-mcGreen">MC管理后台</h1>
+                <button onclick="closeAdmin()" class="text-xl hover:text-red-400"><i class="fa fa-times"></i> 关闭面板</button>
+            </div>
+
+            <!-- 标签切换 -->
+            <div class="flex gap-2 mb-6 border-b border-gray-700 pb-3">
+                <button onclick="switchTab('serverTab')" class="tab-btn px-4 py-2 rounded bg-mcGreen" data-tab="serverTab">服务器管理</button>
+                <button onclick="switchTab('staffTab')" class="tab-btn px-4 py-2 rounded bg-gray-700" data-tab="staffTab">管理人员管理</button>
+                <button onclick="switchTab('qaTab')" class="tab-btn px-4 py-2 rounded bg-gray-700" data-tab="qaTab">自定义问答</button>
+            </div>
+
+            <!-- 服务器管理 -->
+            <div id="serverTab" class="tab-content">
+                <h3 class="text-xl mb-3">添加/修改服务器</h3>
+                <div class="grid md:grid-cols-2 gap-4 mb-4">
+                    <input id="serverName" placeholder="服务器名称，如生存服" class="bg-mcGray p-2 rounded border border-gray-600">
+                    <input id="serverIp" placeholder="服务器地址 127.0.0.1:25565" class="bg-mcGray p-2 rounded border border-gray-600">
+                </div>
+                <button onclick="addServer()" class="btn-mc px-4 py-2 rounded mb-6">添加服务器</button>
+                <div id="serverList" class="space-y-3"></div>
+            </div>
+
+            <!-- 管理人员管理 -->
+            <div id="staffTab" class="tab-content hidden">
+                <h3 class="text-xl mb-3">新增服务器管理人员</h3>
+                <div class="grid md:grid-cols-2 gap-4 mb-3">
+                    <input id="staffName" placeholder="玩家游戏ID" class="bg-mcGray p-2 rounded border border-gray-600">
+                    <input id="staffRole" placeholder="职位：服主/副服主/管理员/OP/建筑师" class="bg-mcGray p-2 rounded border border-gray-600">
+                </div>
+                <button onclick="addStaff()" class="btn-mc px-4 py-2 rounded mb-6">添加管理人员</button>
+                <div id="staffList" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+            </div>
+
+            <!-- 自定义问答 -->
+            <div id="qaTab" class="tab-content hidden">
+                <h3 class="text-xl mb-3">新增问答</h3>
+                <input id="qInput" placeholder="问：" class="w-full bg-mcGray p-2 rounded border border-gray-600 mb-2">
+                <textarea id="aInput" placeholder="答：" rows="3" class="w-full bg-mcGray p-2 rounded border border-gray-600 mb-3"></textarea>
+                <button onclick="addQA()" class="btn-mc px-4 py-2 rounded mb-6">保存问答</button>
+                <div id="qaList" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主页面内容 -->
+    <div class="container mx-auto px-4 py-12">
+        <div class="glass rounded-xl p-6 mb-8">
+            <h1 class="text-4xl font-bold text-center text-mcGreen mb-6">我的世界服务器中心</h1>
+            
+            <!-- 服务器切换选择 -->
+            <div class="mb-6">
+                <h3 class="text-lg mb-2">选择服务器：</h3>
+                <select id="serverSelect" onchange="changeServer()" class="w-full md:w-1/2 bg-mcGray p-3 rounded border border-gray-600 text-lg">
+                    <option value="">暂无服务器，请管理员添加</option>
+                </select>
+                <div class="mt-4 p-4 bg-mcDark rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <p class="text-xl">当前服务器地址：<span id="currentIp" class="text-mcGreen font-bold">无</span></p>
+                    <button onclick="copyCurrentIp()" class="btn-mc px-4 py-2 rounded flex items-center gap-2 self-start md:self-auto">
+                        <i class="fa fa-copy"></i>
+                        <span>一键复制IP</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 管理人员展示 -->
+        <div class="glass rounded-xl p-6 mb-8">
+            <h2 class="text-2xl mb-4 text-mcGreen">服务器管理人员</h2>
+            <div id="homeStaffList" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+        </div>
+
+        <!-- 问答展示区 -->
+        <div class="glass rounded-xl p-6">
+            <h2 class="text-2xl mb-4 text-mcGreen">常见问答</h2>
+            <div id="homeQaList" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化本地存储数据
+        if (!localStorage.getItem('mcServerData')) localStorage.setItem('mcServerData', JSON.stringify([]));
+        if (!localStorage.getItem('mcStaffData')) localStorage.setItem('mcStaffData', JSON.stringify([]));
+        if (!localStorage.getItem('mcQAData')) localStorage.setItem('mcQAData', JSON.stringify([]));
+
+        // 数据读取函数
+        function getServers() { return JSON.parse(localStorage.getItem('mcServerData')) }
+        function saveServers(arr) { localStorage.setItem('mcServerData', JSON.stringify(arr)) }
+        function getStaff() { return JSON.parse(localStorage.getItem('mcStaffData')) }
+        function saveStaff(arr) { localStorage.setItem('mcStaffData', JSON.stringify(arr)) }
+        function getQA() { return JSON.parse(localStorage.getItem('mcQAData')) }
+        function saveQA(arr) { localStorage.setItem('mcQAData', JSON.stringify(arr)) }
+
+        // 登录逻辑
+        function openLogin() { document.getElementById('loginModal').classList.remove('hidden'); }
+        function closeLogin() {
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('loginTip').classList.add('hidden');
+            document.getElementById('loginPwd').value = '';
+        }
+        function checkLogin() {
+            const user = document.getElementById('loginUser').value;
+            const pwd = document.getElementById('loginPwd').value;
+            if (user === 'admin' && pwd === '8941') {
+                closeLogin();
+                openAdminPanel();
+            } else {
+                document.getElementById('loginTip').classList.remove('hidden');
+            }
+        }
+
+        // 后台面板控制
+        function openAdminPanel() {
+            document.getElementById('adminPanel').classList.remove('hidden');
+            renderAllAdmin();
+        }
+        function closeAdmin() {
+            document.getElementById('adminPanel').classList.add('hidden');
+        }
+
+        // 标签切换
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('bg-mcGreen');
+                b.classList.add('bg-gray-700');
+            })
+            document.querySelector(`[data-tab="${tabId}"]`).classList.remove('bg-gray-700');
+            document.querySelector(`[data-tab="${tabId}"]`).classList.add('bg-mcGreen');
+        }
+
+        // 服务器操作
+        function addServer() {
+            const name = document.getElementById('serverName').value.trim();
+            const ip = document.getElementById('serverIp').value.trim();
+            if (!name || !ip) return alert('请填写服务器名称和地址');
+            const list = getServers();
+            list.push({ id: Date.now(), name, ip });
+            saveServers(list);
+            document.getElementById('serverName').value = '';
+            document.getElementById('serverIp').value = '';
+            renderAllAdmin();
+            renderHomeServer();
+        }
+        function delServer(id) {
+            let list = getServers();
+            list = list.filter(s => s.id != id);
+            saveServers(list);
+            renderAllAdmin();
+            renderHomeServer();
+        }
+        function renderServerAdmin() {
+            const list = getServers();
+            const box = document.getElementById('serverList');
+            box.innerHTML = '';
+            if (list.length === 0) {
+                box.innerHTML = '<p class="text-gray-400">暂无服务器</p>';
+                return;
+            }
+            list.forEach(item => {
+                box.innerHTML += `
+                <div class="bg-mcGray p-3 rounded flex justify-between items-center gap-2">
+                    <div class="min-w-0">
+                        <p class="font-bold text-mcGreen">${item.name}</p>
+                        <p class="truncate">${item.ip}</p>
+                    </div>
+                    <div class="flex gap-2 shrink-0">
+                        <button onclick="copyText('${item.ip}')" class="text-blue-400 hover:text-blue-300" title="复制IP"><i class="fa fa-copy"></i></button>
+                        <button onclick="delServer(${item.id})" class="text-red-400 hover:text-red-300">删除</button>
+                    </div>
+                </div>
+                `
+            })
+        }
+
+        // 管理人员操作
+        function addStaff() {
+            const name = document.getElementById('staffName').value.trim();
+            const role = document.getElementById('staffRole').value.trim();
+            if (!name || !role) return alert('请填写游戏ID和职位');
+            const list = getStaff();
+            list.push({ id: Date.now(), name, role });
+            saveStaff(list);
+            document.getElementById('staffName').value = '';
+            document.getElementById('staffRole').value = '';
+            renderAllAdmin();
+            renderHomeStaff();
+        }
+        function delStaff(id) {
+            let list = getStaff();
+            list = list.filter(p => p.id != id);
+            saveStaff(list);
+            renderAllAdmin();
+            renderHomeStaff();
+        }
+        function renderStaffAdmin() {
+            const list = getStaff();
+            const box = document.getElementById('staffList');
+            box.innerHTML = '';
+            if (list.length === 0) {
+                box.innerHTML = '<p class="text-gray-400 col-span-3">暂无管理人员</p>';
+                return;
+            }
+            list.forEach(item => {
+                box.innerHTML += `
+                <div class="bg-mcGray p-3 rounded flex justify-between items-center">
+                    <div>
+                        <span class="font-bold">${item.name}</span>
+                        <span class="ml-2 text-mcGreen">[${item.role}]</span>
+                    </div>
+                    <button onclick="delStaff(${item.id})" class="text-red-400 text-sm">删除</button>
+                </div>
+                `
+            })
+        }
+
+        // 问答操作
+        function addQA() {
+            const q = document.getElementById('qInput').value.trim();
+            const a = document.getElementById('aInput').value.trim();
+            if (!q || !a) return alert('请填写问题和回答');
+            const list = getQA();
+            list.push({ id: Date.now(), q, a });
+            saveQA(list);
+            document.getElementById('qInput').value = '';
+            document.getElementById('aInput').value = '';
+            renderAllAdmin();
+            renderHomeQA();
+        }
+        function delQA(id) {
+            let list = getQA();
+            list = list.filter(i => i.id != id);
+            saveQA(list);
+            renderAllAdmin();
+            renderHomeQA();
+        }
+        function renderQAAdmin() {
+            const list = getQA();
+            const box = document.getElementById('qaList');
+            box.innerHTML = '';
+            if (list.length === 0) {
+                box.innerHTML = '<p class="text-gray-400">暂无问答</p>';
+                return;
+            }
+            list.forEach(item => {
+                box.innerHTML += `
+                <div class="bg-mcGray p-4 rounded">
+                    <div class="flex justify-between mb-2">
+                        <span class="text-mcGreen font-bold">问：${item.q}</span>
+                        <button onclick="delQA(${item.id})" class="text-red-400">删除</button>
+                    </div>
+                    <p class="text-gray-200">答：${item.a}</p>
+                </div>
+                `
+            })
+        }
+
+        // 后台全部渲染
+        function renderAllAdmin() {
+            renderServerAdmin();
+            renderStaffAdmin();
+            renderQAAdmin();
+        }
+
+        // 首页服务器渲染与切换
+        function renderHomeServer() {
+            const list = getServers();
+            const sel = document.getElementById('serverSelect');
+            sel.innerHTML = '';
+            if (list.length === 0) {
+                sel.innerHTML = '<option value="">暂无服务器，请管理员添加</option>';
+                document.getElementById('currentIp').innerText = '无';
+                return;
+            }
+            list.forEach(item => {
+                sel.innerHTML += `<option value="${item.id}" data-ip="${item.ip}">${item.name} | ${item.ip}</option>`
+            })
+            changeServer();
+        }
+        function changeServer() {
+            const sel = document.getElementById('serverSelect');
+            const ip = sel.options[sel.selectedIndex].dataset.ip || '无';
+            document.getElementById('currentIp').innerText = ip;
+        }
+
+        // 一键复制当前IP
+        function copyCurrentIp() {
+            const ip = document.getElementById('currentIp').innerText;
+            if (ip === '无') return alert('当前没有可用服务器IP');
+            copyText(ip);
+        }
+
+        // 通用复制函数
+        function copyText(text) {
+            // 优先使用现代剪贴板API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopyTip();
+                }).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+        // 备用复制（兼容旧浏览器）
+        function fallbackCopy(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                document.execCommand('copy');
+                showCopyTip();
+            } catch (e) {
+                alert('复制失败，请手动复制');
+            }
+            document.body.removeChild(ta);
+        }
+        // 复制成功提示
+        let copyTipTimer = null;
+        function showCopyTip() {
+            const tip = document.getElementById('copyTip');
+            tip.style.display = 'block';
+            clearTimeout(copyTipTimer);
+            copyTipTimer = setTimeout(() => {
+                tip.style.display = 'none';
+            }, 1500);
+        }
+
+        // 首页管理人员展示
+        function renderHomeStaff() {
+            const list = getStaff();
+            const box = document.getElementById('homeStaffList');
+            box.innerHTML = '';
+            if (list.length === 0) {
+                box.innerHTML = '<p class="text-gray-400 col-span-4">暂无服务器管理人员</p>';
+                return;
+            }
+            list.forEach(item => {
+                box.innerHTML += `
+                <div class="bg-mcDark p-3 rounded-lg text-center">
+                    <p class="text-lg font-bold">${item.name}</p>
+                    <p class="text-mcGreen mt-1">${item.role}</p>
+                </div>
+                `
+            })
+        }
+
+        // 首页问答展示
+        function renderHomeQA() {
+            const list = getQA();
+            const box = document.getElementById('homeQaList');
+            box.innerHTML = '';
+            if (list.length === 0) {
+                box.innerHTML = '<p class="text-gray-400">暂无自定义问答</p>';
+                return;
+            }
+            list.forEach(item => {
+                box.innerHTML += `
+                <div class="bg-mcDark p-4 rounded-lg">
+                    <p class="text-mcGreen font-bold mb-2">Q：${item.q}</p>
+                    <p class="text-gray-100">A：${item.a}</p>
+                </div>
+                `
+            })
+        }
+
+        // 页面加载执行渲染
+        window.onload = function() {
+            renderHomeServer();
+            renderHomeStaff();
+            renderHomeQA();
+        }
+    </script>
+</body>
+</html>
